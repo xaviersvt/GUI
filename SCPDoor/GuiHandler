@@ -1,0 +1,206 @@
+// https://gyazo.com/138407696d80992d14d9e80cb1598a8b 
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TextService = game:GetService("TextService")
+
+local World = Workspace:WaitForChild("World")
+	local Doors = World:FindFirstChild("Doors"):GetChildren()
+
+local ClientModules = ReplicatedStorage:WaitForChild("ClientModules")
+	local DoorClient = require(ClientModules:FindFirstChild("DoorClient"))
+
+local Clearances = {
+	["Level-CD"] = 1,
+	["Level-0"] = 2,
+	["Level-1"] = 3,
+	["Level-2"] = 4,
+	["Level-3"] = 5,
+	["Level-4"] = 6,
+	["Level-5"] = 7,
+	["Level-Omni"] = 8,	
+	["Level-MTF"] = "MTF"
+}
+
+local GuiHandler = {}
+
+GuiHandler.Functions = {}
+
+
+function Tween (Object, Lenght, Table)
+	local Tweeninfo = TweenInfo.new(Lenght)
+	
+	local tween = TweenService:Create(Object, Tweeninfo, Table)
+	tween:Play()
+
+end
+
+function GuiHandler:InitializeGuis(Player)
+	local PlayerGui = Player:WaitForChild("PlayerGui")
+	
+	for _,v in pairs(PlayerGui:GetChildren()) do
+		if self.Functions[v.Name] ~= nil then
+			self.Functions[v.Name](v)
+		end
+	end
+end
+
+GuiHandler.Functions["Keybind"] = function(Gui)
+	local Player = Players.LocalPlayer
+	local Backpack = Player.Backpack
+	local Character = Player.Character or Player.Characteradded:Wait()
+		local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+	
+	local Clearance = Gui:FindFirstChild("Clearance")
+	local Press = Gui:FindFirstChild("Press") 
+	
+	local function CheckClearance(PlaceToSearch, Level)
+		for _, Card in pairs (PlaceToSearch:GetChildren()) do for Name,v in pairs(Clearances) do
+				if Card.Name == Name then
+					if typeof(Clearances[Card.Name]) == "number" and typeof(Level) == "number" and Clearances[Card.Name] >= Level then
+						return Card.Name
+					elseif typeof(Clearances[Card.Name]) == "string" and typeof(Level) == "string" and Clearances[Card.Name] == Level then
+						return Card.Name
+					end	
+				end
+		end	end
+	end	
+
+	local Attachment1 = Instance.new("Attachment")
+	local Attachment2 = Instance.new("Attachment")
+	local Beam = Instance.new("Beam")
+
+	Beam.Attachment0 = Attachment1
+	Beam.Attachment1 = Attachment2
+	Beam.Width0 = 0.1
+	Beam.Width1 = 0.1
+	Beam.FaceCamera = true
+	
+	RunService.Heartbeat:Connect(function()
+						
+		local function Colored(Door, Variable)
+			if Door then
+				
+			local function Changing(Color, Material)
+
+				for i,v in pairs(Door:GetChildren()) do
+					if v:IsA("UnionOperation") and v:FindFirstChild("GetColor") then
+						v.GetColor.Material = Material
+						Tween(v.GetColor, 0.3, {Color = Color})
+					end
+				end
+
+			end
+				
+			local Opened = Door:GetAttribute("Opened")
+				
+			if Variable.Check and Variable.Key then
+				Changing(Color3.fromRGB(216, 27, 27), "Neon")	
+			elseif Variable.Check and not Opened then
+				Changing(Color3.fromRGB(213, 115, 61), "Neon")
+			elseif not Variable.Check and not Opened then
+				Changing(Color3.fromRGB(0,0,0), "Metal")
+			elseif Opened then
+				Changing(Color3.fromRGB(24, 255, 12), "Neon")
+			end
+
+		  end
+		end
+		
+		local v
+		
+		if DoorClient:InBound(Player) then
+			
+			v = DoorClient:InBound(Player)
+			
+			local Level = v:GetAttribute("Level")
+			local Key = CheckClearance(Character, Level) or CheckClearance(Backpack, Level)
+			
+			local ScriptedComponents = v:WaitForChild("ScriptedComponents")
+				local Attachment = ScriptedComponents:FindFirstChild("Attachment")
+			
+			Colored(v, {Check = true})
+				
+			Tween(Clearance, 0.3, {TextTransparency = 0})
+			Tween(Press, 0.3, {TextTransparency = 0})
+			
+			
+			Attachment1.Parent = Attachment
+			Attachment2.Parent = Character:FindFirstChild("HumanoidRootPart")
+			Beam.Parent = Attachment
+			
+			Beam.Enabled = true
+			
+			if Key then 
+				Press.TextColor3 = Color3.fromRGB(255,255,255)
+				Clearance.TextColor3 = Color3.fromRGB(255,255,255)
+					
+				Clearance.Text = "You have the allowed clearance to open this door"
+			else
+				Press.TextColor3 = Color3.fromRGB(222, 32, 32)
+				Clearance.TextColor3 = Color3.fromRGB(255, 58, 58)
+				
+				Clearance.Text = "You need a ".. DoorClient.Cards[Level]  .." clearance to open this door"
+
+				Colored(v, {Check = true, Key = true})
+			end
+		else
+			Tween(Clearance, 0.3, {TextTransparency = 1})
+			Tween(Press, 0.3, {TextTransparency = 1})
+			
+			Colored(v, {Check = false})
+			
+			Beam.Enabled = false
+			
+		end
+	end)
+end
+
+GuiHandler.Functions["Command"] = function(Gui)
+	local Bar = Gui:WaitForChild("Bar")
+		local CommandBar = Bar:WaitForChild("CommandBar")
+	
+	local Output = Gui:WaitForChild("Output")
+
+		CommandBar.FocusLost:Connect(function(EnterPressed)
+			if EnterPressed then
+			
+				if CommandBar.Text == "Attack Firewall" then
+					CommandBar.Text = ""	
+					local Text = "while (firewall) {\n 	AttackFireWall\n}"
+				
+					local TextLabel = Instance.new("TextLabel")
+					TextLabel.Parent = Output
+					TextLabel.BackgroundTransparency = 1
+					TextLabel.Font = Enum.Font.Code
+					TextLabel.TextScaled = true
+					TextLabel.Size = UDim2.new(1,0,0.09,0)
+					TextLabel.TextWrapped = true
+					TextLabel.TextColor3 = Color3.fromRGB(255,255,255)
+					TextLabel.TextXAlignment = "Left"
+					TextLabel.TextYAlignment = "Top"
+				
+					local UITextSizeConstraint = Instance.new("UITextSizeConstraint")
+					UITextSizeConstraint.Parent = TextLabel
+					UITextSizeConstraint.MaxTextSize = 33
+				
+					for i = 1,#Text do 
+						TextLabel.Text = string.sub(Text, 1, i)
+						wait(0.01)
+					end
+				end
+			
+				CommandBar.Text = ""	
+			
+			end
+		
+		end)
+	
+end
+
+return GuiHandler
+ 	
