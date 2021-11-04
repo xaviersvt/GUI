@@ -1,0 +1,302 @@
+// https://gyazo.com/c2bc41872c5d6a690915414e9dcc49da
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+	local Main = PlayerGui:WaitForChild("Main")
+
+local Character = Main:WaitForChild("Character")
+	local CharSlot = Character:FindFirstChild("Slots")
+
+local Inventory = Main:WaitForChild("Inventory")
+	local InventorySlot = Inventory:FindFirstChild("Inside"):WaitForChild("Slots")
+
+local Mouse = Player:GetMouse()
+local oldParent, oldPosition, Current
+local DragEnabled = false
+
+local ClientInventory = {}
+	ClientInventory.Check = {}
+
+	ClientInventory.GradientRarity = {
+		Common = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(20,20,20)), 
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(99,99,99)), 
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(199,199,199)),
+		}),
+		
+		Uncommon = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(20,20,20)), 
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(29,99,0)), 
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(17,255,0)),
+		}),
+		
+		Rare = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(20,20,20)), 
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,99,99)), 
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(0,255,238)),
+		}),
+		
+		Epic = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(20,20,20)), 
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(91,0,99)), 
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(170,0,255)),
+		}),
+		
+		Legendary = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(20,20,20)), 
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(99,79,0)), 
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255,179,0)),
+		}),
+	}
+
+	ClientInventory.ColorRarity = {
+		Common = Color3.fromRGB(199,199,199),
+		Uncommon = Color3.fromRGB(17,255,0),
+		Rare = Color3.fromRGB(0,258,238),
+		Epic = Color3.fromRGB(170,0,255),
+		Legendary = Color3.fromRGB(255,179,0)
+	}
+
+	-- Input Handler --
+
+	function GetInput()
+
+		UserInputService.InputBegan:Connect(function(Input, GameProceedEvent)
+
+			if GameProceedEvent then return end
+
+			if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+				MoveFrame()	
+			end
+
+			if Input.KeyCode == Enum.KeyCode.C then
+				return "C"
+			end
+
+			if Input.KeyCode == Enum.KeyCode.I then
+				return "I"
+			end
+
+		end)
+	
+		UserInputService.InputEnded:Connect(function(Input, GameProceedEvent) 
+		
+			if GameProceedEvent then return end
+
+			if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+				InitializeEnding()
+			end
+			
+		end)
+	
+	end
+
+	-- Utility for both
+
+	function CheckPos (Frame)
+		local X,Y = Mouse.X, Mouse.Y
+		local SizeX, SizeY = Frame.AbsoluteSize.X, Frame.AbsoluteSize.Y
+		local PosX, PosY = Frame.AbsolutePosition.X, Frame.AbsolutePosition.Y
+		local InBounds = (X > PosX and Y > PosY and X < (PosX + SizeX) and Y < (PosY + SizeY))
+		return InBounds and Frame.Visible
+	end
+
+	-- While Mouse is Pressed --
+
+	function MovingFrame (Frame) 
+		Frame.Position = UDim2.new(0, Mouse.X, 0, Mouse.Y)
+		Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	end
+
+	function MoveFrame() 
+		local frame = GetSample(CharSlot) or GetSample(InventorySlot)
+			
+		if frame and not DragEnabled then
+			
+			oldParent = frame.Parent
+			oldPosition = frame.Position
+			Current = frame
+			DragEnabled = true
+			local absx, absy = frame.AbsoluteSize.X, frame.AbsoluteSize.Y
+			frame.Size = UDim2.new(0, absx, 0, absy)
+			frame.Parent = Main
+			frame.ZIndex = 4
+			while DragEnabled do
+				MovingFrame(frame)
+				wait()
+			end
+		end
+
+	end
+
+	function GetSample (Parent) 
+		local frame
+	
+		for i,v in pairs(Parent:GetChildren()) do
+			if not v:IsA("UIGridLayout") then
+				if v:FindFirstChild("Sample") and CheckPos(v:FindFirstChild("Sample")) then
+					frame = v.Sample
+					return frame
+				end
+			end			
+		end	
+	end
+
+	-- While Mouse is Released --
+
+	function SortPriority ()
+	
+		table.sort(ClientInventory.Check, function(val1, val2)
+			if val1 and val2 then
+				return val1[2]<val2[2]
+			end
+			return 1 > 2
+		end)	
+	
+	end
+
+	function EnterDistance(Parent) 
+	
+		for i,v in pairs(Parent:GetChildren()) do
+			if v:IsA("ImageLabel") then
+				local Distance = (v.AbsolutePosition - Vector2.new(Mouse.X, Mouse.Y)).magnitude
+
+				if Current and CheckPos(v) then
+					table.insert(ClientInventory.Check, {v, Distance})
+				end 				
+			end
+		end
+
+	end
+
+	-- Move the sample --
+
+	function MoveSample(Sample)
+		local Frame = ClientInventory.Check[1][1]
+		local Attributes = Current:GetAttributes()
+	
+		Sample.Parent = Frame
+		Sample.Size = UDim2.new(1, 0, 1, 0)
+		Sample.Position = oldPosition
+		Sample.AnchorPoint = Vector2.new(0,0)
+		Sample.ZIndex = 4
+	
+		-- Remote:Fire(Attributes)
+	end
+
+	function SwitchSample(Sample)
+		local Frame = ClientInventory.Check[1][1]
+		local OldSample = Frame:FindFirstChild("Sample")
+		local SampleAttributes = Sample:GetAttributes()
+		local OldSampleAttributes = Frame.Sample:GetAttributes()
+
+		OldSample.Parent = oldParent
+		OldSample.Size = UDim2.new(1,0,1,0)
+		OldSample.Position = oldPosition
+		OldSample.ZIndex = 4
+	
+		Sample.Parent = Frame
+		Sample.AnchorPoint = Vector2.new(0,0)
+		Sample.Position = oldPosition
+		Sample.Size = UDim2.new(1,0,1,0)
+		Sample.ZIndex = 4
+
+	
+		-- Remote:Fire(SampleAttributes, OldSampleAttributes)
+	end
+
+	function RemoveSample(Sample)
+		Sample.Parent = oldParent
+		Sample.Position = oldPosition
+		Sample.AnchorPoint = Vector2.new(0,0)
+		Sample.Size = UDim2.new(1,0,1,0)	
+		Sample.ZIndex = 4
+	end
+
+	-- Check if it only move or switch the sample --
+
+	function CheckSwitch(Sample)
+		local Frame = ClientInventory.Check[1][1]
+	
+		if (Frame:FindFirstChild("Sample")) then
+			if InventorySlot:IsAncestorOf(oldParent) and InventorySlot:IsAncestorOf(Frame.Sample) then
+				SwitchSample(Sample)
+			elseif Sample:GetAttribute("Type") == Frame.Sample:GetAttribute("Type") then
+				SwitchSample(Sample)
+			else
+				RemoveSample(Sample)	
+			end
+		else
+			CheckMovement(Sample)			
+		end
+	
+	end
+
+	function CheckMovement (Sample)
+		local Frame = ClientInventory.Check[1][1]
+	
+		if CharSlot:IsAncestorOf(Frame)	then
+			if Frame.Name == Sample:GetAttribute("Type") then
+				MoveSample(Sample)
+			else
+				RemoveSample(Sample)
+			end		
+		else
+			MoveSample(Sample)
+		end
+	
+	end
+
+	function InitializeEnding()	
+
+		if DragEnabled then
+			DragEnabled = false
+		
+			if oldParent then
+				ClientInventory.Check = {}
+				table.insert(ClientInventory.Check, {oldParent, (oldParent.AbsolutePosition - Vector2.new(Mouse.X, Mouse.Y)).magnitude})
+
+				EnterDistance(InventorySlot)
+				EnterDistance(CharSlot)
+
+				SortPriority()
+
+				if Current then
+					CheckSwitch(Current)
+				end
+			end
+		end
+
+	end
+
+	-- Adding new item called by the server --
+
+	function ClientInventory.AddNewSample(Attributes) 
+
+		local Clone = script.Sample:Clone()
+			local Inside = Clone:WaitForChild("Inside")
+			local UIGradient = Inside:WaitForChild("UIGradient")
+		
+		Clone.Parent = InventorySlot:WaitForChild(Attributes.Case)
+		Clone.ImageColor3 = ClientInventory.ColorRarity[Attributes.Rarity]
+		UIGradient.Color = ClientInventory.GradientRarity[Attributes.Rarity]
+		
+		Clone:SetAttribute("Ammount", Attributes.Ammount)
+		Clone:SetAttribute("Item", Attributes.Item)
+		Clone:SetAttribute("Stackable", Attributes.Stackable)
+		Clone:SetAttribute("Type", Attributes.Type)
+
+	end
+
+	-- Function which initialize module --
+
+	function ClientInventory:Call()
+		GetInput()	
+	end
+	
+return ClientInventory
