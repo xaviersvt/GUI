@@ -1,0 +1,55 @@
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local World = Workspace:WaitForChild("World")
+	local Doors = World:FindFirstChild("Doors"):GetChildren()
+
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+	local DoorEvent = Remotes:FindFirstChild("DoorEvent")
+
+local List = {
+	["Door"] = {}
+}
+
+List.Cards = {
+	"Level CD",
+	"Level 0",
+	"Level 1",
+	"Level 2",
+	"Level 3",
+	"Level 4",
+	"Level 5",
+	"Omni",
+}
+
+	 function List:InBound(Player)
+		
+		for i = 1, #Doors do 
+	
+			local Character = Player.Character or Player.CharacterAdded:Wait()
+				local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+
+			local ScriptedComponents = Doors[i]:WaitForChild("ScriptedComponents")
+				local Door1 = ScriptedComponents:FindFirstChild("Door1")
+	
+			if Door1 and (Door1.Position - HumanoidRootPart.Position).Magnitude <= 10 then
+				return Doors[i]
+			end
+	
+		end
+			
+	end
+
+	function List:Keybind(Player)
+	
+		local Check	 = self:InBound(Player)
+	
+		if Check then
+			DoorEvent:FireServer({Action = "Open", Door = Check})
+		end
+	
+	end
+
+return List
